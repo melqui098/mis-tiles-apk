@@ -1,0 +1,26 @@
+{
+ "songs": [
+  {
+   "id": "angeles-fuimos",
+   "v": 3,
+   "name": "Ángeles fuimos",
+   "audio": "songs/angeles-fuimos.mp3",
+   "chart": "songs/angeles-fuimos.json",
+   "level": "dificil",
+   "duration": 228.8,
+   "speed": 1.3,
+   "cost": 0
+  },
+  {
+   "id": "bobadita",
+   "v": 3,
+   "name": "Bobadita",
+   "audio": "songs/bobadita.mp3",
+   "chart": "songs/bobadita.json",
+   "level": "dificil",
+   "duration": 244.5,
+   "cost": 150,
+   "speed": 1.25
+  }
+ ]
+}

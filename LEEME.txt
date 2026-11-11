@@ -1,0 +1,12 @@
+MIS TILES - CÓMO SACAR EL APK (sin instalar nada en tu computador)
+
+1. Crea una cuenta gratis en github.com y un repositorio nuevo (botón "New"), por ejemplo "mis-tiles".
+2. Sube TODO el contenido de esta carpeta al repositorio (botón "Add file" > "Upload files").
+   Importante: sube también la carpeta oculta ".github" (si no la ves, activa "mostrar archivos ocultos").
+3. En el repositorio entra a la pestaña "Actions". Se ejecuta sola "Construir APK" (tarda unos 5 a 8 minutos).
+   Si no arranca, entra a "Construir APK" > "Run workflow".
+4. Cuando termine con check verde, abre esa ejecución y al final, en "Artifacts", descarga "mis-tiles-apk".
+5. Descomprime y pasa app-debug.apk al celular. Ábrelo y permite "instalar apps de origen desconocido".
+
+Para actualizar el juego: me pides el cambio, reemplazas www/index.html (y www/songs si hay canciones nuevas)
+en el repositorio y vuelve a salir un APK nuevo solo.
