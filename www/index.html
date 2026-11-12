@@ -520,10 +520,20 @@ function paintBg(c, W, H, bg, scroll){
   c.fillStyle = bg.line;
   for (let i=1;i<4;i++) c.fillRect(Math.round(lw * i) - 0.5, 0, 1, H);
 }
+function rr(c, x, y, w, h, r){
+  r = Math.max(0, Math.min(r, w / 2, h / 2));
+  c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+}
 function paintTile(c, sk, x, y, w, h){
-  c.fillStyle = sk.fill(c, y, h); c.fillRect(x, y, w, h);
-  if (sk.edge){ c.strokeStyle = sk.edge; c.lineWidth = 2; c.strokeRect(x + 1, y + 1, w - 2, h - 2); }
-  c.fillStyle = 'rgba(255,255,255,.14)'; c.fillRect(x, y, w, 3);
+  const r = Math.min(16, w * 0.2);
+  rr(c, x, y, w, h, r); c.fillStyle = sk.fill(c, y, h); c.fill();
+  // brillo suave en la parte de arriba
+  c.save(); rr(c, x, y, w, h, r); c.clip();
+  const hh = Math.min(h, 48), g = c.createLinearGradient(0, y, 0, y + hh);
+  g.addColorStop(0, 'rgba(255,255,255,.26)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = g; c.fillRect(x, y, w, hh);
+  c.restore();
+  if (sk.edge){ rr(c, x + 1, y + 1, w - 2, h - 2, r - 1); c.strokeStyle = sk.edge; c.lineWidth = 2; c.stroke(); }
 }
 
 /* Tienda */
@@ -1330,12 +1340,17 @@ function draw(gt){
   const SK = G.skin;
   paintBg(c2, W, H, G.bg, Math.max(0, gt) * G.sp);
   // línea de golpe
-  c2.fillStyle = G.bg.hit; c2.fillRect(0, G.hitY - 1, W, 2);
-  // destellos de carril
+  c2.fillStyle = G.bg.hit; c2.globalAlpha = 0.28; c2.fillRect(0, G.hitY - 4, W, 8); c2.globalAlpha = 1;
+  c2.fillRect(0, G.hitY - 1, W, 2);
+  // destellos de carril: rojo al fallar, color del diseño al acertar
   for (let i=G.flashes.length-1;i>=0;i--){
-    const f = G.flashes[i], a = 1 - (gt - f.t) / 0.6;
+    const f = G.flashes[i], a = 1 - (gt - f.t) / (f.good ? 0.32 : 0.6);
     if (a <= 0){ G.flashes.splice(i,1); continue; }
-    c2.fillStyle = 'rgba(229,36,59,' + (a * 0.4) + ')'; c2.fillRect(f.lane * lw, 0, lw, H);
+    if (f.good){
+      c2.fillStyle = SK.flash;
+      for (let k=0;k<14;k++){ c2.globalAlpha = a * 0.034 * (14 - k); c2.fillRect(f.lane * lw, G.hitY + th/2 - (k + 1) * th * 0.15, lw, th * 0.15 + 1); }
+      c2.globalAlpha = 1;
+    } else { c2.fillStyle = 'rgba(229,36,59,' + (a * 0.4) + ')'; c2.fillRect(f.lane * lw, 0, lw, H); }
   }
   // fichas
   const start = Math.max(0, G.scan - 14);
@@ -1347,15 +1362,15 @@ function draw(gt){
     const x = t.lane * lw + 2, y = yc - th/2 - long + 2, w = lw - 4, h = th + long - 4;
     if (t.hit){
       const age = gt - t.hitAt, a = 1 - age / 0.4;
-      if (a > 0){ c2.globalAlpha = a; c2.fillStyle = SK.flash; c2.fillRect(x, y, w, h); c2.globalAlpha = 1; }
+      if (a > 0){ const e = (1 - a) * 7; c2.globalAlpha = a * 0.9; c2.fillStyle = SK.flash; rr(c2, x - e, y - e, w + 2 * e, h + 2 * e, Math.min(16, w * 0.2) + e); c2.fill(); c2.globalAlpha = 1; }
       continue;
     }
-    if (t.missed){ c2.fillStyle = BAD; c2.fillRect(x, y, w, h); c2.fillStyle = 'rgba(255,255,255,.14)'; c2.fillRect(x, y, w, 3); }
+    if (t.missed){ rr(c2, x, y, w, h, Math.min(16, w * 0.2)); c2.fillStyle = BAD; c2.fill(); }
     else paintTile(c2, SK, x, y, w, h);
     if (t.dur > 0){
       if (t.state === 1 && !t.missed){
         const yl = Math.max(y, G.hitY - th/2);
-        if (yl < y + h){ c2.fillStyle = SK.hold; c2.fillRect(x, yl, w, y + h - yl); }
+        if (yl < y + h){ c2.save(); rr(c2, x, y, w, h, Math.min(16, w * 0.2)); c2.clip(); c2.fillStyle = SK.hold; c2.globalAlpha = 0.9; c2.fillRect(x, yl, w, y + h - yl); c2.restore(); }
       }
       c2.fillStyle = 'rgba(255,255,255,.2)'; c2.fillRect(x + w/2 - 1, y + 12, 2, Math.max(0, h - th - 6));
       c2.fillRect(x + 10, yc - th/2 + 2, w - 20, 2);
@@ -1369,8 +1384,15 @@ function draw(gt){
   for (let i=G.ripples.length-1;i>=0;i--){
     const r = G.ripples[i], age = gt - r.t, a = 1 - age / 0.4;
     if (a <= 0){ G.ripples.splice(i,1); continue; }
-    c2.strokeStyle = r.bad ? 'rgba(229,36,59,' + a + ')' : 'rgba(255,90,31,' + a + ')';
-    c2.lineWidth = 3; c2.beginPath(); c2.arc(r.x, r.y, 10 + age * 220, 0, Math.PI * 2); c2.stroke();
+    const col = r.bad ? BAD : SK.flash;
+    c2.fillStyle = col; c2.strokeStyle = col; c2.lineCap = 'round';
+    c2.globalAlpha = a * 0.35; c2.beginPath(); c2.arc(r.x, r.y, 8 + age * 100, 0, Math.PI * 2); c2.fill();
+    c2.globalAlpha = a * 0.9; c2.lineWidth = 1 + 4 * a; c2.beginPath(); c2.arc(r.x, r.y, 12 + age * 210, 0, Math.PI * 2); c2.stroke();
+    if (!r.bad){
+      c2.globalAlpha = a; c2.lineWidth = 3;
+      for (let k=0;k<8;k++){ const an = k * Math.PI / 4 + 0.4, d0 = 16 + age * 130, d1 = d0 + 11 * a; c2.beginPath(); c2.moveTo(r.x + Math.cos(an) * d0, r.y + Math.sin(an) * d0); c2.lineTo(r.x + Math.cos(an) * d1, r.y + Math.sin(an) * d1); c2.stroke(); }
+    }
+    c2.globalAlpha = 1;
   }
 }
 
@@ -1396,7 +1418,7 @@ cv.addEventListener('pointerdown', e => {
     const yTop = yc - G.tileH/2 - t.dur * G.sp * t.mul;
     if (t.lane === lane && t.state === 0 && y >= yTop - 36 && y <= yc + G.tileH/2 + 24){
       G.hits++; G.score++;
-      G.ripples.push({x, y, t:gt, bad:false});
+      G.ripples.push({x, y, t:gt, bad:false}); G.flashes.push({lane, t:gt, good:true});
       if (t.dur > 0 && gt < t.T + t.dur - 0.12){ t.state = 1; t.pressAt = gt; t.lastAcc = gt; G.holds.set(e.pointerId, t); }
       else completeTile(t, gt);
       updateHud();
