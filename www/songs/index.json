@@ -32,6 +32,17 @@
    "duration": 212.7,
    "speed": 1.25,
    "cost": 0
+  },
+  {
+   "id": "cuando-vuelvas-conmigo",
+   "v": 1,
+   "name": "Cuando vuelvas conmigo",
+   "audio": "songs/cuando-vuelvas-conmigo.mp3",
+   "chart": "songs/cuando-vuelvas-conmigo.json",
+   "level": "normal",
+   "duration": 295.8,
+   "speed": 1.0,
+   "cost": 0
   }
  ]
 }
