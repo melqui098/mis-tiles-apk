@@ -777,11 +777,11 @@ const tick = () => new Promise(r => setTimeout(r, 0));
    3) selección por programación dinámica con separación mínima según el nivel
    4) largas sobre notas sostenidas, dobles en acentos, carriles que siguen la melodía */
 const A_SR = 22050;
-const OPT = {fmin:170};   // rango de tono de las notas sostenidas
+const OPT = {fmin:150, fmax:800, vp:45, tol:0.8, minrun:0.5};   // rango de tono de las notas sostenidas
 const LEVEL_CFG = {
-  facil:   {sep:0.27, speed:0.75},
-  normal:  {sep:0.22, speed:1.00},
-  dificil: {sep:0.19, speed:1.25}
+  facil:   {sep:0.32, speed:0.75, types:'vcig', dblGap:1e9},
+  normal:  {sep:0.24, speed:1.00, types:'vcigp', dblGap:3.5},
+  dificil: {sep:0.19, speed:1.25, types:'vcigpw', dblGap:1.4}
 };
 function melBank(nb, fmin, fmax, N, sr){
   const mel = f => 2595 * Math.log10(1 + f / 700), inv = m => 700 * (Math.pow(10, m / 2595) - 1);
@@ -855,9 +855,10 @@ async function extractFeatures(L, R, onProgress){
   const bankG = melBank(40, 80, 6000, N, sr), bankV = melBank(28, 250, 3500, N, sr);
   const mG = new Float32Array(frames * 40), mV = new Float32Array(frames * 28);
   // tono: suma de armónicos sobre el espectro centrado
-  const f0c = []; for (let f=90; f<650; f+=2) f0c.push(f);
+  const f0c = []; for (let f=140; f<=800; f+=3) f0c.push(f);
+  const NG = f0c.length;
   const hb = f0c.map(f => { const a = []; for (let h=1;h<=8;h++) a.push(Math.round(f * h / binHz)); return a; });
-  const f0 = new Float32Array(frames), sal = new Float32Array(frames);
+  const f0 = new Float32Array(frames), sal = new Float32Array(frames), SAL = new Float32Array(frames * NG);
   const re = new Float32Array(N), im = new Float32Array(N), tm = new Float32Array(N/2 + 1), cen = new Float32Array(N/2 + 1), lc = new Float32Array(N/2 + 1);
   for (let f=0; f<frames; f++){
     const off = f * HOP;
@@ -873,14 +874,29 @@ async function extractFeatures(L, R, onProgress){
     }
     for (let i=0;i<40;i++){ const b = bankG[i]; let s = 0; for (let j=0;j<b.w.length;j++) s += tm[b.a + j] * b.w[j]; mG[f*40 + i] = Math.log1p(s * 0.5); }
     for (let i=0;i<28;i++){ const b = bankV[i]; let s = 0; for (let j=0;j<b.w.length;j++) s += cen[b.a + j] * b.w[j]; mV[f*28 + i] = Math.log1p(s * 0.5); }
-    let best = -1, bi = 0;
-    for (let c=0;c<f0c.length;c++){
+    for (let c=0;c<NG;c++){
       let s = 0; const h = hb[c];
       for (let q=0;q<8;q++) if (h[q] < N/2) s += lc[h[q]] / Math.sqrt(q + 1);
-      if (s > best){ best = s; bi = c; }
+      SAL[f * NG + c] = s;
     }
-    f0[f] = f0c[bi]; sal[f] = best;
     if (f % 250 === 0){ onProgress(0.05 + 0.5 * f / frames); await tick(); }
+  }
+  // seguimiento de tono con continuidad (Viterbi): evita los saltos de octava y al bajo
+  { const W = 40, LAM = 0.12, bp = new Int16Array(frames * NG);
+    let prev = SAL.slice(0, NG), cur = new Float32Array(NG);
+    for (let f=1; f<frames; f++){
+      let mx = -1e9;
+      for (let c=0;c<NG;c++){
+        const lo = Math.max(0, c - W), hi = Math.min(NG - 1, c + W);
+        let best = -1e9, bi = c;
+        for (let q=lo;q<=hi;q++){ const v = prev[q] - LAM * Math.abs(q - c); if (v > best){ best = v; bi = q; } }
+        cur[c] = best + SAL[f * NG + c]; bp[f * NG + c] = bi; if (cur[c] > mx) mx = cur[c];
+      }
+      for (let c=0;c<NG;c++) cur[c] -= mx;
+      const t = prev; prev = cur; cur = t;
+    }
+    let c = 0; for (let q=1;q<NG;q++) if (prev[q] > prev[c]) c = q;
+    for (let f=frames-1; f>=0; f--){ f0[f] = f0c[c]; sal[f] = SAL[f * NG + c]; c = bp[f * NG + c] || c; }
   }
   const superflux = (m, nb) => {
     const out = new Float32Array(frames), lag = 2;
@@ -955,17 +971,17 @@ function buildCandidates(F){
   }
   // notas sostenidas y cambios de nota
   const st = new Float32Array(frames); for (let i=0;i<frames;i++) st[i] = 12 * Math.log2(Math.max(f0[i], 1) / 440);
-  const p55 = pctile(sal, 55), good = new Uint8Array(frames);
-  for (let i=0;i<frames;i++) good[i] = (sal[i] > p55 && f0[i] >= OPT.fmin && f0[i] <= 700) ? 1 : 0;
+  const p55 = pctile(sal, OPT.vp), good = new Uint8Array(frames);
+  for (let i=0;i<frames;i++) good[i] = (sal[i] > p55 && f0[i] >= OPT.fmin && f0[i] <= OPT.fmax) ? 1 : 0;
   const runs = []; const GAP = 6;
   for (let i=0;i<frames;){
     if (!good[i]){ i++; continue; }
     let j = i, last = i; const ref = [st[i]];
     while (j + 1 < frames && j + 1 - last <= GAP){
       j++;
-      if (good[j] && Math.abs(st[j] - medianOf(ref)) < 1.2){ last = j; ref.push(st[j]); }
+      if (good[j] && Math.abs(st[j] - medianOf(ref)) < OPT.tol){ last = j; ref.push(st[j]); }
     }
-    if ((last - i + 1) / fps >= 0.4) runs.push([i / fps, (last + 1) / fps]);
+    if ((last - i + 1) / fps >= OPT.minrun) runs.push([i / fps, (last + 1) / fps]);
     i = last + 1;
   }
   have = cand.map(c => c[0]).sort((a, b) => a - b);
@@ -993,11 +1009,11 @@ function buildCandidates(F){
 function composeChart(F, C, level, seed){
   const {fps, f0, sal, dur} = F, cfg = LEVEL_CFG[level], SEP = cfg.sep, GAP = SEP, MAXLONG = 2.4;
   const rnd = mulberry(seed);
-  const cc = C.cand.filter(c => c[0] > 0.3 && c[0] < dur - 1.5);
+  const cc = C.cand.filter(c => c[0] > 0.3 && c[0] < dur - 1.5 && cfg.types.indexOf(c[2]) >= 0);
   const chosen = selectDP(cc, SEP);
   const longs = [];
   for (const [a, b] of C.runs){
-    const d = Math.min(b - a, MAXLONG) * 0.92; if (d < 0.4) continue;
+    const d = Math.min(b - a, MAXLONG) * 0.92; if (d < OPT.minrun) continue;
     let best = null;
     for (const [t, s] of chosen) if (t >= a - 0.15 && t <= a + 0.30){ const k = Math.abs(t - a); if (!best || k < best[0]) best = [k, t, s]; }
     longs.push(best ? [best[1], d, best[2]] : [a + 0.02, d, 1]);
@@ -1015,11 +1031,11 @@ function composeChart(F, C, level, seed){
   const shorts = fin.filter(f => f[1] === 0 && 'vic'.indexOf(f[3]) >= 0).map(f => f[2]).sort((a, b) => a - b);
   const thr = shorts.length ? shorts[Math.floor(shorts.length * 0.85)] : Infinity;
   const dbl = new Set(); let lastD = -9;
-  for (const [t, , s, ty] of fin) if ((ty === 'c' || ('vi'.indexOf(ty) >= 0 && s >= thr)) && t - lastD > 1.4 && t > 3){ dbl.add(Math.round(t * 1e6)); lastD = t; }
-  const p55 = pctile(sal, 55);
+  for (const [t, , s, ty] of fin) if ((ty === 'c' || ('vi'.indexOf(ty) >= 0 && s >= thr)) && t - lastD > cfg.dblGap && t > 3){ dbl.add(Math.round(t * 1e6)); lastD = t; }
+  const p55 = pctile(sal, OPT.vp);
   const pitchAt = t => {
     const a = Math.floor(t * fps), v = [];
-    for (let i=a;i<a+6 && i<f0.length;i++) if (sal[i] > p55 && f0[i] >= OPT.fmin && f0[i] <= 700) v.push(f0[i]);
+    for (let i=a;i<a+6 && i<f0.length;i++) if (sal[i] > p55 && f0[i] >= OPT.fmin && f0[i] <= OPT.fmax) v.push(f0[i]);
     return v.length >= 2 ? medianOf(v) : null;
   };
   const chart = []; let prevLane = 1, prevP = null;
@@ -1046,23 +1062,20 @@ function composeChart(F, C, level, seed){
   return chart;
 }
 
-// densidad natural de la canción → nivel (fácil / normal / difícil)
-function pickLevel(C, dur){
-  const cc = C.cand.filter(c => c[0] > 0.3 && c[0] < dur - 1.5);
-  const nps = selectDP(cc, 0.27).length / dur;
-  return {level: nps < LEVEL_T[0] ? 'facil' : (nps < LEVEL_T[1] ? 'normal' : 'dificil'), nps};
-}
-const LEVEL_T = [2.0, 2.5];
-
+// El nivel sale del ritmo real de la canción: se arma el mapa más completo y se mide cuántas fichas por segundo trae.
+// Una canción lenta sale Fácil (solo golpes claros, sin fichas de relleno); una rápida, Difícil.
+const LEVEL_T = [2.05, 2.6];
 async function analyzeSignal(L, R, seed, onProgress){
   if (L.length < A_SR * 8) throw new Error('muy corto');
   const F = await extractFeatures(L, R, onProgress);
   const C = buildCandidates(F);
   onProgress(0.92); await tick();
-  const lv = pickLevel(C, F.dur);
-  const chart = composeChart(F, C, lv.level, seed);
+  const full = composeChart(F, C, 'dificil', seed);
+  const nps = new Set(full.map(c => c[0])).size / F.dur;
+  const level = nps < LEVEL_T[0] ? 'facil' : (nps < LEVEL_T[1] ? 'normal' : 'dificil');
+  const chart = level === 'dificil' ? full : composeChart(F, C, level, seed);
   onProgress(1);
-  return {chart, level:lv.level, speed:LEVEL_CFG[lv.level].speed, nps:Math.round(lv.nps * 100) / 100};
+  return {chart, level, speed:LEVEL_CFG[level].speed, nps:Math.round(nps * 100) / 100};
 }
 async function toStereo22k(buf){
   const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;

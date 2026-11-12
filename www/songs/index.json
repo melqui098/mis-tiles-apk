@@ -21,6 +21,17 @@
    "duration": 244.5,
    "cost": 150,
    "speed": 1.25
+  },
+  {
+   "id": "see-you-again",
+   "v": 1,
+   "name": "See You Again (versión en español)",
+   "audio": "songs/see-you-again.mp3",
+   "chart": "songs/see-you-again.json",
+   "level": "facil",
+   "duration": 240.1,
+   "speed": 0.75,
+   "cost": 0
   }
  ]
 }
