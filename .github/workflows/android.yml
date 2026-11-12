@@ -19,6 +19,12 @@ jobs:
           java-version: 17
       - run: npm install
       - run: npx cap add android
+      - name: Firma fija y número de versión (para que cada APK se instale encima del anterior)
+        run: |
+          mkdir -p ~/.android
+          cp debug.keystore ~/.android/debug.keystore
+          sed -i "s/versionCode 1/versionCode ${{ github.run_number }}/" android/app/build.gradle
+          grep -n "versionCode" android/app/build.gradle
       - name: Pantalla vertical
         run: sed -i 's/<activity /<activity android:screenOrientation="portrait" /' android/app/src/main/AndroidManifest.xml
       - run: npx cap sync android

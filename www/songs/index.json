@@ -23,14 +23,14 @@
    "speed": 1.25
   },
   {
-   "id": "see-you-again",
+   "id": "mi-corazon-encantado",
    "v": 1,
-   "name": "See You Again (versión en español)",
-   "audio": "songs/see-you-again.mp3",
-   "chart": "songs/see-you-again.json",
-   "level": "facil",
-   "duration": 240.1,
-   "speed": 0.75,
+   "name": "Mi corazón encantado",
+   "audio": "songs/mi-corazon-encantado.mp3",
+   "chart": "songs/mi-corazon-encantado.json",
+   "level": "dificil",
+   "duration": 212.7,
+   "speed": 1.25,
    "cost": 0
   }
  ]
