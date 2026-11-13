@@ -217,6 +217,24 @@ h2{font-size:28px;font-weight:700}
 #shop .btn-line{border-color:rgba(255,255,255,.65);color:#fff}
 #shop .btn-line:disabled{opacity:1;background:rgba(255,255,255,.16);border-color:transparent;color:#ffe9a0}
 #shop .btn-ink{background:#fff;color:#2a1260}
+.nv{position:relative}
+.ndot{position:absolute;top:6px;right:calc(50% - 22px);width:12px;height:12px;border-radius:50%;background:#ff2d87;border:2px solid #fff;animation:pd 1.2s ease-in-out infinite}
+@keyframes pd{50%{transform:scale(1.3)}}
+#shop .sec{color:#fff;font-size:22px;font-weight:800;margin:0 0 10px}
+.chests{display:flex;flex-direction:column;gap:10px;margin-bottom:22px}
+.chest{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px;border-radius:16px;background:rgba(255,255,255,.1);border:2px solid rgba(255,255,255,.22)}
+.chest.ready{border-color:#ffd23f;box-shadow:0 0 18px rgba(255,210,63,.45);background:rgba(255,210,63,.14)}
+.chest.ready .chest-ico{animation:cw 1s ease-in-out infinite}
+@keyframes cw{25%{transform:rotate(-6deg)}75%{transform:rotate(6deg)}}
+.chest-ico{width:56px;height:50px;display:block}
+.chest-info{display:flex;flex-direction:column;gap:4px;min-width:0}
+.chest-info b{font-family:var(--font-display);font-size:18px;font-weight:800;color:#fff}
+.chest-n{font-size:13px;color:#c4bbf0}
+.chest .bar{display:block;height:8px;border-radius:5px;background:rgba(255,255,255,.2);overflow:hidden}
+.chest .bar u{display:block;height:100%;background:linear-gradient(90deg,#22d3ee,#ffd23f);border-radius:5px}
+.chest .btn{min-height:44px;padding:0 14px;font-size:15px;white-space:nowrap}
+.chest-r{display:flex;flex-direction:column;gap:10px}
+.chest-r .rw{font-size:19px}
 .toast{bottom:calc(96px + env(safe-area-inset-bottom,0px));background:#2a1260;border:1px solid rgba(255,255,255,.25)}
 .dgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .dg{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:76px;padding:8px 4px;border-radius:12px;background:var(--paper-2);font-weight:800;font-variant-numeric:tabular-nums;text-align:center}
@@ -238,7 +256,7 @@ h2{font-size:28px;font-weight:700}
 <nav id="nav" aria-label="Menú principal">
   <button id="navSongs" class="nv" type="button" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg><span>Canciones</span></button>
   <button id="navAdd" class="nv add" type="button"><i class="plus"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></i><span>Agregar</span></button>
-  <button id="navShop" class="nv" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1 12H6L5 8z"/><path d="M9 8a3 3 0 0 1 6 0"/></svg><span>Tienda</span></button>
+  <button id="navShop" class="nv" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1 12H6L5 8z"/><path d="M9 8a3 3 0 0 1 6 0"/></svg><span>Tienda</span><i id="navDot" class="ndot" hidden></i></button>
 </nav>
 
 <div id="app">
@@ -271,12 +289,15 @@ h2{font-size:28px;font-weight:700}
       <div class="shop-head">
         <div><p class="eyebrow">Diseños</p><h1>Tienda</h1></div>
       </div>
+      <h2 class="sec">Cofres</h2>
+      <div id="chests" class="chests"></div>
+      <h2 class="sec">Diseños</h2>
       <div class="tabs" role="group" aria-label="Tipo de diseño">
         <button id="tabBg" type="button" aria-pressed="true">Fondos</button>
         <button id="tabTile" type="button" aria-pressed="false">Teclas</button>
       </div>
       <div id="shopGrid" class="shop-grid"></div>
-      <p class="hint">Los diamantes se ganan al conseguir estrellas y coronas en cada canción.</p>
+      <p class="hint">Las estrellas y coronas que consigues en las canciones llenan los cofres. Los diamantes sirven para comprar diseños.</p>
     </div>
   </section>
 
@@ -328,6 +349,15 @@ h2{font-size:28px;font-weight:700}
     <p class="hint" style="margin:0">Entra cada día y el regalo mejora. El día 7 es el más grande.</p>
     <div id="dailyGrid" class="dgrid"></div>
     <button id="dailyBtn" class="btn btn-flame btn-wide" type="button">Reclamar</button>
+  </div>
+</div>
+
+<div id="chestM" class="modal" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="chestT">
+    <h2 id="chestT">Cofre</h2>
+    <p class="hint" style="margin:0">¡Esto había dentro!</p>
+    <div id="chestR" class="chest-r"></div>
+    <button id="chestOk" class="btn btn-flame btn-wide" type="button">¡Genial!</button>
   </div>
 </div>
 
@@ -440,7 +470,7 @@ let songs = [];
 const SVG_COIN = '<svg class="ico2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#ffc928" stroke="#0b0c10" stroke-width="1.6"/><circle cx="12" cy="12" r="6" fill="none" stroke="#b8860b" stroke-width="1.8"/></svg>';
 const SVG_GEM = '<svg class="ico2" viewBox="0 0 24 24" aria-hidden="true"><polygon points="7,3 17,3 22,9 12,22 2,9" fill="#22d3ee" stroke="#0b0c10" stroke-width="1.6" stroke-linejoin="round"/><polyline points="2,9 22,9" fill="none" stroke="#0b0c10" stroke-width="1.2"/></svg>';
 const SVG_LOCK = '<svg class="ico2" viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="11" rx="1.5" fill="currentColor"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="currentColor" stroke-width="2.4"/></svg>';
-function newWallet(){ return {id:'__wallet', coins:50, diamonds:5, daily:{last:'', day:0}, unlocked:{}, owned:{bg:['papel'], tile:['clasica']}, equipped:{bg:'papel', tile:'clasica'}}; }
+function newWallet(){ return {id:'__wallet', coins:50, diamonds:5, daily:{last:'', day:0}, unlocked:{}, starsE:null, crownsE:null, chestS:0, chestC:0, owned:{bg:['papel'], tile:['clasica']}, equipped:{bg:'papel', tile:'clasica'}}; }
 function normWallet(w){
   const d = newWallet(); w = Object.assign(d, w || {}); w.id = '__wallet';
   w.owned = Object.assign({bg:['papel'], tile:['clasica']}, w.owned);
@@ -460,6 +490,7 @@ function renderWallet(){
   document.querySelectorAll('.gi').forEach(e => { if (!e.firstChild) e.innerHTML = SVG_GEM; });
   document.querySelectorAll('.w-coins').forEach(e => { e.textContent = wallet.coins; });
   document.querySelectorAll('.w-gems').forEach(e => { e.textContent = wallet.diamonds; });
+  const dot = $('navDot'); if (dot) dot.hidden = !(chestState('s').ready || chestState('c').ready);
 }
 function isUnlocked(s){ return !s.cost || !!wallet.unlocked[s.id] || (s.hi || 0) > 0; }
 
@@ -546,6 +577,53 @@ function paintTile(c, sk, x, y, w, h){
   if (sk.edge){ rr(c, x + 1, y + 1, w - 2, h - 2, r - 1); c.strokeStyle = sk.edge; c.lineWidth = 2; c.stroke(); }
 }
 
+
+/* Cofres: uno se abre con estrellas y otro con coronas; cada cofre pide más que el anterior */
+const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const SVG_CHEST = (a, b) => '<svg class="chest-ico" viewBox="0 0 64 56" aria-hidden="true"><defs><linearGradient id="cg' + a.slice(1) + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + a + '"/><stop offset="1" stop-color="' + b + '"/></linearGradient></defs><path d="M6 24 Q6 6 32 6 Q58 6 58 24 Z" fill="url(#cg' + a.slice(1) + ')" stroke="#0b0c10" stroke-width="3" stroke-linejoin="round"/><rect x="6" y="24" width="52" height="26" rx="4" fill="url(#cg' + a.slice(1) + ')" stroke="#0b0c10" stroke-width="3"/><rect x="6" y="24" width="52" height="7" fill="rgba(0,0,0,.22)"/><rect x="26" y="22" width="12" height="14" rx="3" fill="#ffe066" stroke="#0b0c10" stroke-width="2.5"/><circle cx="32" cy="29" r="2" fill="#0b0c10"/></svg>';
+const CHESTS = {
+  s:{name:'Cofre de estrellas', unit:'estrellas', c1:'#38d6ff', c2:'#6366f1', need:k => 3 + 2 * k, cum:k => 3 * (k + 1) + k * (k + 1)},
+  c:{name:'Cofre de coronas', unit:'coronas', c1:'#ffd23f', c2:'#ff2d87', need:k => 3 + k, cum:k => 3 * (k + 1) + k * (k + 1) / 2}
+};
+function chestState(t){
+  const C = CHESTS[t], k = t === 's' ? wallet.chestS : wallet.chestC, earned = (t === 's' ? wallet.starsE : wallet.crownsE) || 0;
+  const prev = k > 0 ? C.cum(k - 1) : 0, need = C.need(k), prog = Math.max(0, earned - prev);
+  return {k, need, prog: Math.min(prog, need), ready: earned >= C.cum(k)};
+}
+function renderChests(){
+  const box = $('chests'); box.textContent = '';
+  for (const t of ['s', 'c']){
+    const C = CHESTS[t], st = chestState(t);
+    const el = document.createElement('div'); el.className = 'chest' + (st.ready ? ' ready' : '');
+    el.innerHTML = SVG_CHEST(C.c1, C.c2) + '<div class="chest-info"><b>' + C.name + '</b><span class="chest-n">N.º ' + (st.k + 1) + ' · ' + st.prog + ' de ' + st.need + ' ' + C.unit + '</span><i class="bar"><u style="width:' + Math.round(st.prog / st.need * 100) + '%"></u></i></div>';
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ' + (st.ready ? 'btn-flame' : 'btn-line'); b.disabled = !st.ready;
+    b.textContent = st.ready ? 'Abrir' : 'Faltan ' + (st.need - st.prog);
+    b.addEventListener('click', () => openChest(t));
+    el.appendChild(b); box.appendChild(el);
+  }
+}
+function openChest(t){
+  const st = chestState(t); if (!st.ready) return;
+  const k = st.k, rnd = Math.random, lines = [];
+  let coins, gems, pSong;
+  if (t === 's'){ coins = 50 + Math.floor(rnd() * 6) * 10 + k * 10; gems = 1 + (rnd() < 0.35 ? 1 : 0); pSong = 0.25; }
+  else { coins = 120 + Math.floor(rnd() * 9) * 10 + k * 15; gems = 3 + Math.floor(rnd() * 3); pSong = 0.45; }
+  const locked = songs.filter(x => x.cost > 0 && !isUnlocked(x));
+  let song = null;
+  if (locked.length && rnd() < pSong){ song = locked[Math.floor(rnd() * locked.length)]; wallet.unlocked[song.id] = true; }
+  wallet.coins += coins; wallet.diamonds += gems;
+  if (t === 's') wallet.chestS++; else wallet.chestC++;
+  saveWallet();
+  lines.push(SVG_COIN + '<span>+' + coins + ' <small>monedas</small></span>');
+  lines.push(SVG_GEM + '<span>+' + gems + ' <small>' + (gems === 1 ? 'diamante' : 'diamantes') + '</small></span>');
+  if (song) lines.push(SVG_LOCK + '<span>' + esc(song.name) + ' <small>canción desbloqueada</small></span>');
+  $('chestT').textContent = CHESTS[t].name;
+  $('chestR').innerHTML = lines.map(l => '<div class="rw">' + l + '</div>').join('');
+  $('chestM').hidden = false;
+  renderChests(); if (song) renderLib();
+}
+$('chestOk').addEventListener('click', () => { $('chestM').hidden = true; });
+
 /* Tienda */
 let shopTab = 'bg', shopArmed = '';
 function previewShop(cv, bg, sk){
@@ -558,7 +636,7 @@ function previewShop(cv, bg, sk){
   paintTile(c, sk, lw * 3 + 2, 116, lw - 4, th - 4);
 }
 function renderShop(){
-  renderWallet();
+  renderWallet(); renderChests();
   $('tabBg').setAttribute('aria-pressed', shopTab === 'bg'); $('tabTile').setAttribute('aria-pressed', shopTab === 'tile');
   const grid = $('shopGrid'); grid.textContent = '';
   const list = shopTab === 'bg' ? BGS : SKINS;
@@ -605,7 +683,10 @@ async function loadSongs(){
   const wdb = all.find(x => x.id === '__wallet');
   let wl = null; try { wl = JSON.parse(localStorage.getItem('mt-wallet') || 'null'); } catch(e){}
   wallet = normWallet(wdb || wl);
-  if (!wdb) saveWallet(); else renderWallet();
+  let mig = false;
+  if (wallet.starsE == null){ wallet.starsE = songs.reduce((a, x) => a + (x.stars || 0), 0); mig = true; }
+  if (wallet.crownsE == null){ wallet.crownsE = songs.reduce((a, x) => a + (x.crowns || 0), 0); mig = true; }
+  if (!wdb || mig) saveWallet(); else renderWallet();
 }
 async function saveMeta(s){ if (!idbOK) return; try { await dbOp('meta','readwrite', st => st.put(s)); } catch(e){} }
 async function saveAudio(id, ab){
@@ -1536,7 +1617,11 @@ function giveRewards(prevS, prevC){
   if (b) lines.push([SVG_COIN, '+' + b, newS === 1 ? 'por 1 estrella nueva' : 'por ' + newS + ' estrellas nuevas']);
   if (c) lines.push([SVG_COIN, '+' + c, newC === 1 ? 'por 1 corona nueva' : 'por ' + newC + ' coronas nuevas']);
   if (gems) lines.push([SVG_GEM, '+' + gems, 'diamantes']);
-  if (coins || gems){ wallet.coins += coins; wallet.diamonds += gems; saveWallet(); }
+  const rdy0 = chestState('s').ready + '' + chestState('c').ready;
+  wallet.starsE = (wallet.starsE || 0) + newS; wallet.crownsE = (wallet.crownsE || 0) + newC;
+  const rs = chestState('s'), rc = chestState('c');
+  if ((rs.ready || rc.ready) && (rs.ready + '' + rc.ready) !== rdy0) lines.push([SVG_CHEST('#ffd23f', '#ff2d87').replace('class="chest-ico"', 'class="ico2"'), '¡Cofre listo!', 'ábrelo en la Tienda']);
+  if (coins || gems || newS || newC){ wallet.coins += coins; wallet.diamonds += gems; saveWallet(); }
   const el = $('resRewards'); el.hidden = !lines.length;
   el.innerHTML = lines.map(l => '<div class="rw">' + l[0] + '<span>' + l[1] + ' <small>' + l[2] + '</small></span></div>').join('');
 }
@@ -1592,5 +1677,3 @@ loadSongs().then(renderLib).then(maybeDaily).then(syncBuiltins);
 renderLib();
 })();
 </script>
-
-</html>
